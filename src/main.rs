@@ -6,6 +6,7 @@ use std::io::Read;
 use std::process::ExitCode;
 use std::time::Instant;
 
+#[allow(clippy::too_many_arguments)]
 fn encode(
     input_file: &str,
     output_file: &str,
@@ -14,6 +15,7 @@ fn encode(
     framerate: u32,
     bitrate: u32,
     keyframe_interval: u32,
+    vp9: bool,
 ) -> Result<(), Box<dyn Error>> {
     let mut yuv_file = File::open(input_file)?;
     let mut yuv = vec![0u8; (width * height * 3 / 2) as _];
@@ -21,7 +23,7 @@ fn encode(
         signature: *ivf::IVF_SIGNATURE,
         version: 0,
         header_size: 32,
-        fourcc: *b"VP80",
+        fourcc: if vp9 { *b"VP90" } else { *b"VP80" },
         width: width as _,
         height: height as _,
         framerate_num: framerate,
@@ -37,7 +39,11 @@ fn encode(
         height,
         timebase: [1, 1000],
         bitrate,
-        codec: vpx_encode::VideoCodecId::VP8,
+        codec: if vp9 {
+            vpx_encode::VideoCodecId::VP9
+        } else {
+            vpx_encode::VideoCodecId::VP8
+        },
     })
     .unwrap();
 
@@ -67,9 +73,9 @@ fn encode(
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 6 {
+    if args.len() < 8 {
         eprintln!(
-            "Usage: {} input_file output_file width height framerate bitrate keyframe_interval",
+            "Usage: {} input_file output_file width height framerate bitrate keyframe_interval [vp9]",
             args[0]
         );
         return ExitCode::FAILURE;
@@ -80,8 +86,12 @@ fn main() -> ExitCode {
     let width: u32 = args[3].parse().expect("Invalid width");
     let height: u32 = args[4].parse().expect("Invalid height");
     let framerate: u32 = args[5].parse().expect("Invalid framerate");
-    let bitrate: u32 = args[5].parse().expect("Invalid bitrate");
-    let keyframe_interval: u32 = args[5].parse().expect("Invalid keyframe interval");
+    let bitrate: u32 = args[6].parse().expect("Invalid bitrate");
+    let keyframe_interval: u32 = args[7].parse().expect("Invalid keyframe interval");
+    let mut vp9 = false;
+    if args.len() >= 9 {
+        vp9 = "vp9".eq(&args[8].trim().to_lowercase());
+    }
 
     if let Err(e) = encode(
         input_file,
@@ -91,6 +101,7 @@ fn main() -> ExitCode {
         framerate,
         bitrate,
         keyframe_interval,
+        vp9,
     ) {
         if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
             match io_err.kind() {
