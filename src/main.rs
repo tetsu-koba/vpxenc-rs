@@ -1,6 +1,7 @@
 use libivf_rs as ivf;
 use std::error::Error;
 use std::fs::File;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -82,7 +83,7 @@ fn main() -> ExitCode {
     let bitrate: u32 = args[5].parse().expect("Invalid bitrate");
     let keyframe_interval: u32 = args[5].parse().expect("Invalid keyframe interval");
 
-    match encode(
+    if let Err(e) = encode(
         input_file,
         output_file,
         width,
@@ -91,11 +92,14 @@ fn main() -> ExitCode {
         bitrate,
         keyframe_interval,
     ) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{e:?}");
-            return ExitCode::FAILURE;
+        if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
+            match io_err.kind() {
+                ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe => return ExitCode::SUCCESS,
+                _ => {}
+            }
         }
+        eprintln!("{e:?}");
+        return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
 }
