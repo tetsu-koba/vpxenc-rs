@@ -3,9 +3,10 @@ use std::error::Error;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::io::Read;
-use std::os::fd::AsRawFd;
 use std::process::ExitCode;
 use std::time::Instant;
+
+#[cfg(target_os = "linux")]
 mod pipe;
 
 #[allow(clippy::too_many_arguments)]
@@ -34,8 +35,12 @@ fn encode(
         unused: 0,
     };
     let outfile = File::create(output_file)?;
-    if cfg!(linux) && pipe::is_pipe(outfile.as_raw_fd()) {
-        pipe::set_pipe_max_size(outfile.as_raw_fd())?;
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::fd::AsRawFd;
+        if pipe::is_pipe(outfile.as_raw_fd()) {
+            pipe::set_pipe_max_size(outfile.as_raw_fd())?;
+        }
     }
     let mut ivf_writer = ivf::IvfWriter::init(outfile, &ivf_header)?;
     _ = keyframe_interval;
