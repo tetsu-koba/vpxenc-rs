@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 libivf-rs = { git = "https://github.com/tetsu-koba/libivf-rs.git"}
 vpx-encode = { version = "0.6.2", features=["vp9"] }
+nix = "0.26.4"
+libc = "0.2.147"
